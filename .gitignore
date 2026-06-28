@@ -1,0 +1,33 @@
+# Secrets
+.env
+*.pem
+*.key
+
+# Vault (generated data — not source)
+HermesVault/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+
+# Logs
+logs/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Root-level ad-hoc scripts (not part of the package)
+test_auth.py
+test_encoding.py
+test_hermes.py
+test_llm.py
