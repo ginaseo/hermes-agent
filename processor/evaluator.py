@@ -184,7 +184,10 @@ class Evaluator:
             q.summary_coverage = 100.0
 
         # Broken references: [[links]] in related files pointing to non-existent docs
-        existing = summary_base | slack_stems
+        wiki_stems = _stems(VAULT / "wiki", "*.md")
+        project_stems = _stems(VAULT / "projects", "*.md")
+        people_stems = _stems(VAULT / "people", "*.md")
+        existing = summary_base | slack_stems | wiki_stems | project_stems | people_stems
         if related_dir.exists():
             for rf in related_dir.glob("*.md"):
                 try:
