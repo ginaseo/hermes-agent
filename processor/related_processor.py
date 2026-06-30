@@ -36,6 +36,15 @@ class RelatedProcessor:
 
         generated = 0
 
+        # Collect existing vault documents for grounding
+        existing_docs: list[str] = []
+        for folder in ("wiki", "projects", "people"):
+            d = VAULT / folder
+            if d.exists():
+                existing_docs += [f.stem for f in d.glob("*.md")]
+        existing_docs += [f.stem for f in SUMMARY.glob("*.md")]
+        doc_list = "\n".join(f"- {d}" for d in sorted(set(existing_docs)))
+
         with LLMClient() as client:
             for file in files:
                 if not state.is_modified(file):
@@ -44,15 +53,16 @@ class RelatedProcessor:
 
                 logger.info(f"[RELATED] {file.name}")
                 summary = file.read_text(encoding="utf-8")
-                prompt = f"""
-아래 문서를 읽고 관련 문서를 추천해주세요.
+                prompt = f"""아래 문서를 읽고 관련 문서를 추천해주세요.
 
 조건
+- Markdown [[문서명]] 형식으로만 출력
+- 아래 [존재하는 문서 목록] 에서만 선택
+- 최대 10개, 중복 제거
+- 목록에 없는 문서는 절대 추가하지 말 것
 
-- Markdown
-- [[문서명]] 형식
-- 최대 10개
-- 중복 제거
+[존재하는 문서 목록]
+{doc_list}
 
 ====================
 

@@ -48,13 +48,15 @@ _STOP = frozenset(
 
 
 def _keywords(text: str) -> set[str]:
-    tokens = re.findall(r"[a-z0-9]+", text.lower())
+    tokens = re.findall(r"[a-z0-9]+|[가-힣]+", text.lower())
     return {t for t in tokens if t not in _STOP and len(t) > 1}
 
 
 def _score(question: str, doc: dict) -> float:
     qkw = _keywords(question)
-    doc_text = f"{doc.get('title', '')} {doc.get('folder', '')}".lower()
+    doc_text = " ".join(
+        str(doc.get(k, "")) for k in ("title", "folder", "tags", "entities", "summary")
+    ).lower()
     dkw = _keywords(doc_text)
     if not qkw:
         return 0.0
@@ -73,31 +75,49 @@ def _search(question: str, index: list[dict], top_k: int = 5) -> list[dict]:
 
 def generate_questions(save: bool = True) -> list[dict]:
     """Auto-generate benchmark questions from entity JSON files."""
-    questions: list[dict] = []
     entity_dir = VAULT / "knowledge" / "entity"
     if not entity_dir.exists():
-        return questions
+        return []
 
+    # Count how many docs each entity appears in — skip generic ones
+    entity_doc_count: dict[str, int] = {}
+    doc_entities: dict[str, list] = {}
     for ef in sorted(entity_dir.glob("*.json")):
         try:
             data = json.loads(ef.read_text(encoding="utf-8"))
         except Exception:
             continue
         entities = data if isinstance(data, list) else data.get("entities", [])
-        stem = ef.stem.removesuffix("-summary")
-        for e in entities[:3]:
+        stem = ef.stem.removesuffix("-entity")
+        doc_entities[stem] = entities
+        for e in entities:
             name = (e.get("name") or "").strip()
-            if not name:
+            if name:
+                entity_doc_count[name] = entity_doc_count.get(name, 0) + 1
+
+    total_docs = len(doc_entities)
+    # Entity is generic if it appears in >50% of docs
+    generic = {n for n, c in entity_doc_count.items() if total_docs > 1 and c / total_docs > 0.5}
+
+    questions: list[dict] = []
+    for stem, entities in doc_entities.items():
+        added = 0
+        for e in entities:
+            if added >= 3:
+                break
+            name = (e.get("name") or "").strip()
+            if not name or name in generic:
                 continue
             questions.append(
                 {
-                    "question": f"What is {name}?",
+                    "question": f"{name}이란?",
                     "expected_docs": [stem],
                     "expected_entities": [name],
                     "expected_keywords": [],
                     "expected_projects": [name] if e.get("type") == "Project" else [],
                 }
             )
+            added += 1
 
     if questions and save:
         QUESTIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
